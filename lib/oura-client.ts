@@ -1,3 +1,5 @@
+import { readOuraAccessToken } from "@/lib/oura-token-state";
+
 export type OuraDailyActivity = {
   day?: string;
   steps?: number;
@@ -18,13 +20,26 @@ function getDateInTimeZone(timeZone: string): string {
   return formatter.format(new Date());
 }
 
+async function getOuraAccessToken(): Promise<string> {
+  const envToken = process.env.OURA_ACCESS_TOKEN;
+  if (envToken) {
+    return envToken;
+  }
+
+  const persistedToken = await readOuraAccessToken();
+  if (persistedToken) {
+    return persistedToken;
+  }
+
+  throw new Error(
+    "Missing Oura access token. Set OURA_ACCESS_TOKEN or complete OAuth callback first."
+  );
+}
+
 export async function fetchOuraDailyActivityForToday(params?: {
   timeZone?: string;
 }): Promise<{ date: string; activity: OuraDailyActivity | null }> {
-  const token = process.env.OURA_ACCESS_TOKEN;
-  if (!token) {
-    throw new Error("Missing OURA_ACCESS_TOKEN env var.");
-  }
+  const token = await getOuraAccessToken();
 
   const timeZone = params?.timeZone ?? process.env.OURA_USER_TIMEZONE ?? "UTC";
   const date = getDateInTimeZone(timeZone);
