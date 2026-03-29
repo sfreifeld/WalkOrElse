@@ -7,12 +7,14 @@ export async function GET() {
   try {
     const previousState = await readOuraState();
     const requestHeaders = await headers();
-    const timeZone =
-      requestHeaders.get("x-user-timezone") ?? process.env.OURA_USER_TIMEZONE;
+    const headerTz = requestHeaders.get("x-user-timezone");
+    const resolvedTimeZone =
+      (headerTz?.trim() ? headerTz : null) ??
+      process.env.OURA_USER_TIMEZONE ??
+      "UTC";
 
-
-    const { date, activity } = await fetchOuraDailyActivityForToday({
-      timeZone: timeZone ?? undefined,
+    const { requested_date, date, activity } = await fetchOuraDailyActivityForToday({
+      timeZone: resolvedTimeZone,
     });
 
     const latestSteps =
@@ -30,8 +32,9 @@ export async function GET() {
 
     return NextResponse.json({
       ok: true,
+      requested_date,
       date,
-      time_zone_used: timeZone ?? "UTC",
+      time_zone_used: resolvedTimeZone,
       oura_activity: activity,
       persisted,
     });
