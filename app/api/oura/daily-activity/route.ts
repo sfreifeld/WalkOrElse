@@ -24,8 +24,10 @@ export async function GET() {
     const lastCheckedAt = new Date().toISOString();
 
     await writeOuraState({
+      date,
       latest_steps: latestSteps,
       last_checked_at: lastCheckedAt,
+      posted: previousState?.posted ?? false,
     });
 
     const persisted = await readOuraState();

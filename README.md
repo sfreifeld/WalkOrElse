@@ -1,6 +1,6 @@
 # Walk Or Else
 
-Single-user MVP for checking Oura steps and persisting the latest daily activity snapshot.
+Single-user MVP for checking Oura steps and persisting state in a local SQLite database.
 
 ## Oura setup (single-user MVP)
 
@@ -47,7 +47,7 @@ Put the `access_token` from the JSON response into `OURA_ACCESS_TOKEN` in `.env.
 ### Configure other env vars
 
 - (Optional) `OURA_USER_TIMEZONE`, for example `America/Los_Angeles`.
-- (Optional) `OURA_TOKEN_FILE_PATH` — see `lib/oura-token-state.ts` if you override the token file location.
+- (Optional) `OURA_STATE_FILE_PATH` if you do not want default `./data/oura-state.json`.
 
 ### Run and verify
 
@@ -64,8 +64,6 @@ curl http://localhost:3000/api/oura/daily-activity
 
 Expected: JSON with `ok: true`, plus Oura activity payload and persisted state.
 
-**Steps vs the Oura app:** The official `daily_activity` API usually lags behind what you see live in the Oura app for “today.” This project requests a 7-day window and picks today’s document if present; otherwise the latest day on or before today. The JSON fields `requested_date` (your calendar “today”) and `date` / `oura_activity.day` (which row was used) explain any mismatch.
-
 ## Token lifecycle notes for this MVP
 
 - Access tokens can come from `OURA_ACCESS_TOKEN` or from the OAuth callback (stored under `data/oura-token.json` by default).
@@ -77,5 +75,4 @@ Expected: JSON with `ok: true`, plus Oura activity payload and persisted state.
 - `OURA_CLIENT_ID` / `OURA_CLIENT_SECRET` (required for automatic OAuth callback token exchange)
 - `OURA_ACCESS_TOKEN` (optional fallback when no token file exists yet, e.g. manual curl flow; OAuth-stored file wins when present)
 - `OURA_USER_TIMEZONE` (optional, defaults to `UTC`)
-- `OURA_TOKEN_FILE_PATH` (optional path for stored OAuth token JSON)
-- `OURA_STATE_FILE_PATH` (optional path for persisted daily-activity snapshot state)
+- `OURA_STATE_FILE_PATH` (optional)

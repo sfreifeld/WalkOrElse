@@ -1,41 +1,29 @@
-import { promises as fs } from "node:fs";
-import path from "node:path";
+import { readLatestDailyState, upsertDailyState } from "@/lib/persistence";
 
 export type OuraPersistedState = {
+  date?: string;
   latest_steps: number;
   last_checked_at: string;
+  posted?: boolean;
 };
 
-const STATE_FILE = process.env.OURA_STATE_FILE_PATH
-  ? path.resolve(process.env.OURA_STATE_FILE_PATH)
-  : path.join(process.cwd(), "data", "oura-state.json");
-
 export async function readOuraState(): Promise<OuraPersistedState | null> {
-  try {
-    const raw = await fs.readFile(STATE_FILE, "utf8");
-    const parsed = JSON.parse(raw) as Partial<OuraPersistedState>;
+  const state = readLatestDailyState();
 
-    if (
-      typeof parsed.latest_steps !== "number" ||
-      typeof parsed.last_checked_at !== "string"
-    ) {
-      return null;
-    }
-
-    return {
-      latest_steps: parsed.latest_steps,
-      last_checked_at: parsed.last_checked_at,
-    };
-  } catch {
+  if (!state) {
     return null;
   }
+
+  return state;
 }
 
 export async function writeOuraState(state: OuraPersistedState): Promise<void> {
-  await fs.mkdir(path.dirname(STATE_FILE), { recursive: true });
-  await fs.writeFile(STATE_FILE, JSON.stringify(state, null, 2), "utf8");
-}
+  const isoDate = state.date ?? new Date().toISOString().slice(0, 10);
 
-export function getOuraStateFilePath(): string {
-  return STATE_FILE;
+  upsertDailyState({
+    date: isoDate,
+    latest_steps: state.latest_steps,
+    last_checked_at: state.last_checked_at,
+    posted: state.posted ?? false,
+  });
 }
