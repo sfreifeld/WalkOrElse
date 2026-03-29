@@ -64,6 +64,29 @@ curl http://localhost:3000/api/oura/daily-activity
 
 Expected: JSON with `ok: true`, plus Oura activity payload and persisted state.
 
+
+## Shame image upload (MVP)
+
+Server route: `POST /api/shame-image/upload` (multipart/form-data).
+
+- Field name: `image`
+- Allowed MIME types: `image/png`, `image/jpeg`, `image/webp`
+- Max upload size: `4 MB`
+- File bytes are stored in Vercel Blob
+- File metadata is stored in SQLite `shame_asset` and linked from `settings.shame_asset_id`
+- Uploading a new image updates the active linked image and attempts to delete the previous blob file
+
+Example:
+
+```bash
+curl -X POST http://localhost:3000/api/shame-image/upload \
+  -F "image=@/absolute/path/to/shame-image.png"
+```
+
+Required env var:
+
+- `BLOB_READ_WRITE_TOKEN`
+
 ## Token lifecycle notes for this MVP
 
 - Access tokens can come from `OURA_ACCESS_TOKEN` or from the OAuth callback (stored under `data/oura-token.json` by default).

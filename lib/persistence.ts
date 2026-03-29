@@ -6,6 +6,7 @@ export type AppSettings = {
   cutoff_time: string;
   paused: boolean;
   tweet_template: string;
+  shame_asset_id: number | null;
 };
 
 export type DailyState = {
@@ -28,7 +29,7 @@ export function readSettings(): AppSettings {
   const db = getDb();
   const row = db
     .prepare(
-      `SELECT threshold, timezone, cutoff_time, paused, tweet_template
+      `SELECT threshold, timezone, cutoff_time, paused, tweet_template, shame_asset_id
        FROM settings
        WHERE id = 1`
     )
@@ -39,6 +40,7 @@ export function readSettings(): AppSettings {
         cutoff_time: string;
         paused: number;
         tweet_template: string;
+        shame_asset_id: number | null;
       }
     | undefined;
 
@@ -49,6 +51,7 @@ export function readSettings(): AppSettings {
       cutoff_time: "21:00",
       paused: false,
       tweet_template: "",
+      shame_asset_id: null,
     };
   }
 
@@ -58,6 +61,7 @@ export function readSettings(): AppSettings {
     cutoff_time: row.cutoff_time,
     paused: row.paused === 1,
     tweet_template: row.tweet_template,
+    shame_asset_id: row.shame_asset_id,
   };
 }
 
@@ -131,6 +135,24 @@ export function createShameAsset(params: {
     );
 
   return Number(result.lastInsertRowid);
+}
+
+export function readShameAssetById(id: number): ShameAsset | null {
+  const db = getDb();
+  const row = db
+    .prepare(
+      `SELECT id, asset_url, storage_key, content_type, original_filename, created_at
+       FROM shame_asset
+       WHERE id = ?`
+    )
+    .get(id) as ShameAsset | undefined;
+
+  return row ?? null;
+}
+
+export function setCurrentShameAssetId(shameAssetId: number | null): void {
+  const db = getDb();
+  db.prepare("UPDATE settings SET shame_asset_id = ? WHERE id = 1").run(shameAssetId);
 }
 
 export function listShameAssets(): ShameAsset[] {

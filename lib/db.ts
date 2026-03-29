@@ -12,7 +12,21 @@ mkdirSync(path.dirname(configuredPath), { recursive: true });
 const db = new DatabaseSync(configuredPath);
 db.exec("PRAGMA journal_mode = WAL;");
 
+db.exec("PRAGMA foreign_keys = ON;");
+
 let schemaReady = false;
+
+function ensureSettingsShameAssetColumn(): void {
+  const columns = db
+    .prepare("PRAGMA table_info(settings)")
+    .all() as Array<{ name: string }>;
+
+  const hasShameAssetId = columns.some((column) => column.name === "shame_asset_id");
+
+  if (!hasShameAssetId) {
+    db.exec("ALTER TABLE settings ADD COLUMN shame_asset_id INTEGER;");
+  }
+}
 
 export function ensureDbSchema(): void {
   if (schemaReady) {
@@ -26,7 +40,9 @@ export function ensureDbSchema(): void {
       timezone TEXT NOT NULL DEFAULT 'UTC',
       cutoff_time TEXT NOT NULL DEFAULT '21:00',
       paused INTEGER NOT NULL DEFAULT 0,
-      tweet_template TEXT NOT NULL DEFAULT ''
+      tweet_template TEXT NOT NULL DEFAULT '',
+      shame_asset_id INTEGER,
+      FOREIGN KEY (shame_asset_id) REFERENCES shame_asset(id) ON DELETE SET NULL
     );
 
     CREATE TABLE IF NOT EXISTS daily_state (
@@ -46,6 +62,8 @@ export function ensureDbSchema(): void {
       CHECK (asset_url IS NOT NULL OR storage_key IS NOT NULL)
     );
   `);
+
+  ensureSettingsShameAssetColumn();
 
   db.exec(
     `INSERT INTO settings (id) VALUES (1) ON CONFLICT(id) DO NOTHING;`
