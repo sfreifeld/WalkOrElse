@@ -6,8 +6,10 @@ import { readOuraState, writeOuraState } from "@/lib/oura-state";
 export async function GET() {
   try {
     const previousState = await readOuraState();
+    const requestHeaders = await headers();
     const timeZone =
-      headers().get("x-user-timezone") ?? process.env.OURA_USER_TIMEZONE;
+      requestHeaders.get("x-user-timezone") ?? process.env.OURA_USER_TIMEZONE;
+
 
     const { date, activity } = await fetchOuraDailyActivityForToday({
       timeZone: timeZone ?? undefined,
