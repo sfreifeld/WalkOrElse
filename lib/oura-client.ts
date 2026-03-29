@@ -20,33 +20,69 @@ function getDateInTimeZone(timeZone: string): string {
   return formatter.format(new Date());
 }
 
-async function getOuraAccessToken(): Promise<string> {
-  const envToken = process.env.OURA_ACCESS_TOKEN;
-  if (envToken) {
-    return envToken;
-  }
+/** Civil YYYY-MM-DD minus N calendar days (no TZ conversion; safe for ISO date strings). */
+function subtractCalendarDays(ymd: string, days: number): string {
+  const [y, m, d] = ymd.split("-").map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  dt.setUTCDate(dt.getUTCDate() - days);
+  return dt.toISOString().slice(0, 10);
+}
 
+/**
+ * Oura often has no `daily_activity` row for "today" yet (data lags vs the live app).
+ * Prefer today's document; otherwise the latest day on or before today in the range.
+ */
+function pickDailyActivityForDisplay(
+  rows: OuraDailyActivity[] | undefined,
+  today: string
+): OuraDailyActivity | null {
+  if (!rows?.length) return null;
+
+  const exact = rows.find((r) => r.day === today);
+  if (exact) return exact;
+
+  const candidates = rows.filter((r) => r.day && r.day <= today);
+  if (candidates.length === 0) return null;
+
+  candidates.sort((a, b) => (b.day ?? "").localeCompare(a.day ?? ""));
+  return candidates[0];
+}
+
+async function getOuraAccessToken(): Promise<string> {
+  // Prefer token from OAuth callback (file) so a stale OURA_ACCESS_TOKEN in .env.local
+  // does not override a freshly stored token after "Oura OAuth successful".
   const persistedToken = await readOuraAccessToken();
   if (persistedToken) {
     return persistedToken;
   }
 
+  const envToken = process.env.OURA_ACCESS_TOKEN;
+  if (envToken) {
+    return envToken;
+  }
+
   throw new Error(
-    "Missing Oura access token. Set OURA_ACCESS_TOKEN or complete OAuth callback first."
+    "Missing Oura access token. Complete OAuth callback first or set OURA_ACCESS_TOKEN in .env.local."
   );
 }
 
 export async function fetchOuraDailyActivityForToday(params?: {
   timeZone?: string;
-}): Promise<{ date: string; activity: OuraDailyActivity | null }> {
+}): Promise<{
+  requested_date: string;
+  date: string;
+  activity: OuraDailyActivity | null;
+}> {
   const token = await getOuraAccessToken();
 
   const timeZone = params?.timeZone ?? process.env.OURA_USER_TIMEZONE ?? "UTC";
-  const date = getDateInTimeZone(timeZone);
+  const today = getDateInTimeZone(timeZone);
+  const lookbackDays = 7;
+  const startDate = subtractCalendarDays(today, lookbackDays - 1);
 
   const url = new URL("https://api.ouraring.com/v2/usercollection/daily_activity");
-  url.searchParams.set("start_date", date);
-  url.searchParams.set("end_date", date);
+  url.searchParams.set("start_date", startDate);
+  url.searchParams.set("end_date", today);
 
   const response = await fetch(url, {
     method: "GET",
@@ -62,7 +98,8 @@ export async function fetchOuraDailyActivityForToday(params?: {
   }
 
   const payload = (await response.json()) as OuraDailyActivityResponse;
-  const activity = payload.data?.[0] ?? null;
+  const activity = pickDailyActivityForDisplay(payload.data, today);
+  const date = activity?.day ?? today;
 
-  return { date, activity };
+  return { requested_date: today, date, activity };
 }

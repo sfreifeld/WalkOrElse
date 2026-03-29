@@ -19,9 +19,13 @@ export async function GET(request: Request) {
     const clientSecret = process.env.OURA_CLIENT_SECRET;
 
     if (!clientId || !clientSecret) {
-      return new Response("Missing OURA_CLIENT_ID or OURA_CLIENT_SECRET.", {
-        status: 500,
-      });
+      const missing: string[] = [];
+      if (!clientId) missing.push("OURA_CLIENT_ID");
+      if (!clientSecret) missing.push("OURA_CLIENT_SECRET");
+      return new Response(
+        `Missing env: ${missing.join(", ")}. In .env.local use the exact names OURA_CLIENT_ID and OURA_CLIENT_SECRET (not OURA_SECRET). Restart npm run dev after editing, then try OAuth again.`,
+        { status: 500 }
+      );
     }
 
     const tokenBody = new URLSearchParams({
