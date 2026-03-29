@@ -52,6 +52,9 @@ export function StepStatusCard() {
       const response = await fetch("/api/oura/daily-activity", {
         method: "GET",
         cache: "no-store",
+        headers: {
+          "x-user-timezone": Intl.DateTimeFormat().resolvedOptions().timeZone,
+        },
       });
 
       const data = (await response.json()) as OuraDailyActivityResponse;
