@@ -1,6 +1,5 @@
-const steps = 0;
-const threshold = 5000;
-const lastSync = '11:00 PM';
+import { StepStatusCard } from "@/components/step-status-card";
+
 const paused = false;
 
 export default function Home() {
@@ -11,16 +10,7 @@ export default function Home() {
 
         {paused && <p className="paused-ribbon">PAUSED</p>}
 
-        <div className="step-wrap">
-          <p className="step-count">{steps.toLocaleString()}</p>
-          <p className="step-label">STEPS</p>
-        </div>
-
-        <p className="status-copy">
-          {steps >= threshold ? 'YOU SURVIVED TODAY.' : 'YOU FAILED TODAY.'}
-        </p>
-
-        <p className="sync-copy">LAST SYNC: {lastSync}</p>
+        <StepStatusCard />
 
         <div className="actions">
           <button className="btn btn-secondary" type="button">

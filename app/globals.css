@@ -179,6 +179,14 @@ body::before {
   color: #fff;
 }
 
+
+.retry-btn {
+  margin: 1rem auto 0;
+  display: block;
+  min-height: 54px;
+  font-size: clamp(1rem, 2.2vw, 1.35rem);
+}
+
 .hash {
   margin: 2.5rem 0 0;
   text-align: center;
