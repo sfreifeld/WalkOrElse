@@ -10,6 +10,7 @@ export async function GET() {
     const timeZone =
       requestHeaders.get("x-user-timezone") ?? process.env.OURA_USER_TIMEZONE;
 
+
     const { date, activity } = await fetchOuraDailyActivityForToday({
       timeZone: timeZone ?? undefined,
     });
