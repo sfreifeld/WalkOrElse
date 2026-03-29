@@ -1,6 +1,6 @@
 # Walk Or Else
 
-Single-user MVP for checking Oura steps and persisting the latest daily activity snapshot.
+Single-user MVP for checking Oura steps and persisting state in a local SQLite database.
 
 ## Oura setup (single-user MVP)
 
@@ -57,7 +57,7 @@ Then set:
 
 - `OURA_ACCESS_TOKEN` to the `access_token` from step 3.
 - (Optional) `OURA_USER_TIMEZONE`, for example `America/Los_Angeles`.
-- (Optional) `OURA_STATE_FILE_PATH` if you do not want default `./data/oura-state.json`.
+- (Optional) `DATABASE_FILE_PATH` if you do not want default `./data/walkorelse.db`.
 
 ### 5) Run and verify
 
@@ -74,6 +74,21 @@ curl http://localhost:3000/api/oura/daily-activity
 
 Expected: JSON with `ok: true`, plus Oura activity payload and persisted state.
 
+
+## Persistence (MVP database layer)
+
+This app uses **SQLite** via Node's built-in `node:sqlite` module:
+
+- No external database service required for MVP development.
+- Free-tier friendly (single file in `./data`).
+- Minimal schema for a single-user app (no user/account table).
+
+Tables created automatically on first server call:
+
+- `settings`: `threshold`, `timezone`, `cutoff_time`, `paused`, `tweet_template`
+- `daily_state`: `date`, `latest_steps`, `last_checked_at`, `posted`
+- `shame_asset`: `asset_url`/`storage_key`, `content_type`, `original_filename`, `created_at`
+
 ## Token lifecycle notes for this MVP
 
 - This MVP uses a single static `OURA_ACCESS_TOKEN`.
@@ -84,4 +99,4 @@ Expected: JSON with `ok: true`, plus Oura activity payload and persisted state.
 
 - `OURA_ACCESS_TOKEN` (required)
 - `OURA_USER_TIMEZONE` (optional, defaults to `UTC`)
-- `OURA_STATE_FILE_PATH` (optional)
+- `DATABASE_FILE_PATH` (optional)
