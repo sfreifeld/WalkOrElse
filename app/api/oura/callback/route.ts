@@ -1,10 +1,32 @@
+import { NextResponse } from "next/server";
 import { writeOuraAccessToken } from "@/lib/oura-token-state";
-
-const LOCAL_REDIRECT_URI = "http://localhost:3000/api/oura/callback";
 
 type OuraTokenResponse = {
   access_token?: string;
 };
+
+function jsonError(status: number, message: string, details?: unknown) {
+  return NextResponse.json(
+    {
+      ok: false,
+      error: message,
+      ...(details ? { details } : {}),
+    },
+    { status }
+  );
+}
+
+function resolveRedirectUri(): string {
+  if (process.env.OURA_REDIRECT_URI) {
+    return process.env.OURA_REDIRECT_URI;
+  }
+
+  if (process.env.NEXT_PUBLIC_APP_URL) {
+    return `${process.env.NEXT_PUBLIC_APP_URL.replace(/\/$/, "")}/api/oura/callback`;
+  }
+
+  return "http://localhost:3000/api/oura/callback";
+}
 
 export async function GET(request: Request) {
   try {
@@ -12,7 +34,7 @@ export async function GET(request: Request) {
     const code = url.searchParams.get("code");
 
     if (!code) {
-      return new Response("Missing OAuth code.", { status: 400 });
+      return jsonError(400, "Missing OAuth code.");
     }
 
     const clientId = process.env.OURA_CLIENT_ID;
@@ -22,16 +44,16 @@ export async function GET(request: Request) {
       const missing: string[] = [];
       if (!clientId) missing.push("OURA_CLIENT_ID");
       if (!clientSecret) missing.push("OURA_CLIENT_SECRET");
-      return new Response(
-        `Missing env: ${missing.join(", ")}. In .env.local use the exact names OURA_CLIENT_ID and OURA_CLIENT_SECRET (not OURA_SECRET). Restart npm run dev after editing, then try OAuth again.`,
-        { status: 500 }
+      return jsonError(
+        500,
+        `Missing env vars for OAuth callback: ${missing.join(", ")}.`
       );
     }
 
     const tokenBody = new URLSearchParams({
       grant_type: "authorization_code",
       code,
-      redirect_uri: LOCAL_REDIRECT_URI,
+      redirect_uri: resolveRedirectUri(),
       client_id: clientId,
       client_secret: clientSecret,
     });
@@ -47,29 +69,27 @@ export async function GET(request: Request) {
 
     if (!tokenResponse.ok) {
       const body = await tokenResponse.text();
-      return new Response(`Token exchange failed (${tokenResponse.status}): ${body}`, {
-        status: 502,
-      });
+      return jsonError(502, `Token exchange failed (${tokenResponse.status}).`, body);
     }
 
     const tokenPayload = (await tokenResponse.json()) as OuraTokenResponse;
     const accessToken = tokenPayload.access_token;
 
     if (!accessToken) {
-      return new Response("Token exchange succeeded but no access token was returned.", {
-        status: 502,
-      });
+      return jsonError(502, "Token exchange succeeded but no access token was returned.");
     }
 
     await writeOuraAccessToken(accessToken);
 
-    return new Response("Oura OAuth successful. Access token stored server-side.", {
-      status: 200,
+    return NextResponse.json({
+      ok: true,
+      message: "Oura OAuth successful. Access token stored server-side.",
     });
   } catch (error) {
-    return new Response(
-      `OAuth callback error: ${error instanceof Error ? error.message : "Unknown error"}`,
-      { status: 500 }
+    return jsonError(
+      500,
+      "OAuth callback error.",
+      error instanceof Error ? error.message : "Unknown error"
     );
   }
 }

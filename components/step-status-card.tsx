@@ -57,10 +57,22 @@ export function StepStatusCard() {
         },
       });
 
-      const data = (await response.json()) as OuraDailyActivityResponse;
+      const rawBody = await response.text();
+      let data: OuraDailyActivityResponse | null = null;
 
-      if (!response.ok || !data.ok) {
-        throw new Error(data.error ?? "Failed to load latest Oura activity.");
+      try {
+        data = JSON.parse(rawBody) as OuraDailyActivityResponse;
+      } catch {
+        data = null;
+      }
+
+      if (!response.ok) {
+        const serverMessage = data?.error ?? (rawBody ? rawBody.slice(0, 200) : null);
+        throw new Error(serverMessage ?? `Request failed with status ${response.status}.`);
+      }
+
+      if (!data?.ok) {
+        throw new Error(data?.error ?? "Failed to load latest Oura activity.");
       }
 
       const syncedSteps =
