@@ -3,6 +3,17 @@ import { NextResponse } from "next/server";
 import { fetchOuraDailyActivityForToday } from "@/lib/oura-client";
 import { readOuraState, writeOuraState } from "@/lib/oura-state";
 
+function jsonError(status: number, message: string, details?: unknown) {
+  return NextResponse.json(
+    {
+      ok: false,
+      error: message,
+      ...(details ? { details } : {}),
+    },
+    { status }
+  );
+}
+
 export async function GET() {
   try {
     const previousState = await readOuraState();
@@ -41,12 +52,10 @@ export async function GET() {
       persisted,
     });
   } catch (error) {
-    return NextResponse.json(
-      {
-        ok: false,
-        error: error instanceof Error ? error.message : "Unknown error",
-      },
-      { status: 500 }
+    return jsonError(
+      500,
+      "Failed to fetch and persist Oura daily activity.",
+      error instanceof Error ? error.message : "Unknown error"
     );
   }
 }

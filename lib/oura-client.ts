@@ -49,8 +49,8 @@ function pickDailyActivityForDisplay(
 }
 
 async function getOuraAccessToken(): Promise<string> {
-  // Prefer token from OAuth callback (file) so a stale OURA_ACCESS_TOKEN in .env.local
-  // does not override a freshly stored token after "Oura OAuth successful".
+  // Prefer token persisted by the OAuth callback so a stale OURA_ACCESS_TOKEN
+  // does not override a freshly stored token.
   const persistedToken = await readOuraAccessToken();
   if (persistedToken) {
     return persistedToken;
@@ -62,7 +62,7 @@ async function getOuraAccessToken(): Promise<string> {
   }
 
   throw new Error(
-    "Missing Oura access token. Complete OAuth callback first or set OURA_ACCESS_TOKEN in .env.local."
+    "Missing Oura access token. Complete OAuth callback first or set OURA_ACCESS_TOKEN."
   );
 }
 

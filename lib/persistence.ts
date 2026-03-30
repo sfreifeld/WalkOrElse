@@ -1,4 +1,5 @@
-import { getDb } from "@/lib/db";
+import { sql } from "@vercel/postgres";
+import { ensureDbSchema } from "@/lib/db";
 
 export type AppSettings = {
   threshold: number;
@@ -7,6 +8,7 @@ export type AppSettings = {
   paused: boolean;
   tweet_template: string;
   shame_asset_id: number | null;
+  oura_access_token: string | null;
 };
 
 export type DailyState = {
@@ -25,24 +27,24 @@ export type ShameAsset = {
   created_at: string;
 };
 
-export function readSettings(): AppSettings {
-  const db = getDb();
-  const row = db
-    .prepare(
-      `SELECT threshold, timezone, cutoff_time, paused, tweet_template, shame_asset_id
-       FROM settings
-       WHERE id = 1`
-    )
-    .get() as
-    | {
-        threshold: number;
-        timezone: string;
-        cutoff_time: string;
-        paused: number;
-        tweet_template: string;
-        shame_asset_id: number | null;
-      }
-    | undefined;
+export async function readSettings(): Promise<AppSettings> {
+  await ensureDbSchema();
+
+  const result = await sql<{
+    threshold: number;
+    timezone: string;
+    cutoff_time: string;
+    paused: boolean;
+    tweet_template: string;
+    shame_asset_id: number | null;
+    oura_access_token: string | null;
+  }>`
+    SELECT threshold, timezone, cutoff_time, paused, tweet_template, shame_asset_id, oura_access_token
+    FROM settings
+    WHERE id = 1
+  `;
+
+  const row = result.rows[0];
 
   if (!row) {
     return {
@@ -52,118 +54,105 @@ export function readSettings(): AppSettings {
       paused: false,
       tweet_template: "",
       shame_asset_id: null,
+      oura_access_token: null,
     };
   }
 
-  return {
-    threshold: row.threshold,
-    timezone: row.timezone,
-    cutoff_time: row.cutoff_time,
-    paused: row.paused === 1,
-    tweet_template: row.tweet_template,
-    shame_asset_id: row.shame_asset_id,
-  };
+  return row;
 }
 
-export function upsertDailyState(state: DailyState): void {
-  const db = getDb();
+export async function upsertDailyState(state: DailyState): Promise<void> {
+  await ensureDbSchema();
 
-  db.prepare(
-    `INSERT INTO daily_state (date, latest_steps, last_checked_at, posted)
-     VALUES (?, ?, ?, ?)
-     ON CONFLICT(date)
-     DO UPDATE SET
-       latest_steps = excluded.latest_steps,
-       last_checked_at = excluded.last_checked_at,
-       posted = excluded.posted`
-  ).run(
-    state.date,
-    state.latest_steps,
-    state.last_checked_at,
-    state.posted ? 1 : 0
-  );
+  await sql`
+    INSERT INTO daily_state (date, latest_steps, last_checked_at, posted)
+    VALUES (${state.date}, ${state.latest_steps}, ${state.last_checked_at}, ${state.posted})
+    ON CONFLICT(date)
+    DO UPDATE SET
+      latest_steps = excluded.latest_steps,
+      last_checked_at = excluded.last_checked_at,
+      posted = excluded.posted
+  `;
 }
 
-export function readLatestDailyState(): DailyState | null {
-  const db = getDb();
-  const row = db
-    .prepare(
-      `SELECT date, latest_steps, last_checked_at, posted
-       FROM daily_state
-       ORDER BY date DESC
-       LIMIT 1`
-    )
-    .get() as
-    | {
-        date: string;
-        latest_steps: number;
-        last_checked_at: string;
-        posted: number;
-      }
-    | undefined;
+export async function readLatestDailyState(): Promise<DailyState | null> {
+  await ensureDbSchema();
 
-  if (!row) {
-    return null;
-  }
+  const result = await sql<{
+    date: string;
+    latest_steps: number;
+    last_checked_at: string;
+    posted: boolean;
+  }>`
+    SELECT date::text AS date, latest_steps, last_checked_at::text AS last_checked_at, posted
+    FROM daily_state
+    ORDER BY date DESC
+    LIMIT 1
+  `;
 
-  return {
-    date: row.date,
-    latest_steps: row.latest_steps,
-    last_checked_at: row.last_checked_at,
-    posted: row.posted === 1,
-  };
+  return result.rows[0] ?? null;
 }
 
-export function createShameAsset(params: {
+export async function createShameAsset(params: {
   asset_url?: string;
   storage_key?: string;
   content_type: string;
   original_filename?: string;
-}): number {
-  const db = getDb();
+}): Promise<number> {
+  await ensureDbSchema();
 
-  const result = db
-    .prepare(
-      `INSERT INTO shame_asset (asset_url, storage_key, content_type, original_filename)
-       VALUES (?, ?, ?, ?)`
-    )
-    .run(
-      params.asset_url ?? null,
-      params.storage_key ?? null,
-      params.content_type,
-      params.original_filename ?? null
-    );
+  const result = await sql<{ id: number }>`
+    INSERT INTO shame_asset (asset_url, storage_key, content_type, original_filename)
+    VALUES (${params.asset_url ?? null}, ${params.storage_key ?? null}, ${params.content_type}, ${
+    params.original_filename ?? null
+  })
+    RETURNING id
+  `;
 
-  return Number(result.lastInsertRowid);
+  const row = result.rows[0];
+
+  if (!row) {
+    throw new Error("Failed to create shame asset record.");
+  }
+
+  return row.id;
 }
 
-export function readShameAssetById(id: number): ShameAsset | null {
-  const db = getDb();
-  const row = db
-    .prepare(
-      `SELECT id, asset_url, storage_key, content_type, original_filename, created_at
-       FROM shame_asset
-       WHERE id = ?`
-    )
-    .get(id) as ShameAsset | undefined;
+export async function readShameAssetById(id: number): Promise<ShameAsset | null> {
+  await ensureDbSchema();
 
-  return row ?? null;
+  const result = await sql<ShameAsset>`
+    SELECT id, asset_url, storage_key, content_type, original_filename, created_at::text AS created_at
+    FROM shame_asset
+    WHERE id = ${id}
+  `;
+
+  return result.rows[0] ?? null;
 }
 
-export function setCurrentShameAssetId(shameAssetId: number | null): void {
-  const db = getDb();
-  db.prepare("UPDATE settings SET shame_asset_id = ? WHERE id = 1").run(shameAssetId);
+export async function setCurrentShameAssetId(shameAssetId: number | null): Promise<void> {
+  await ensureDbSchema();
+  await sql`UPDATE settings SET shame_asset_id = ${shameAssetId} WHERE id = 1`;
 }
 
-export function listShameAssets(): ShameAsset[] {
-  const db = getDb();
-  const rows = db
-    .prepare(
-      `SELECT id, asset_url, storage_key, content_type, original_filename, created_at
-       FROM shame_asset
-       ORDER BY created_at DESC`
-    )
-    .all() as Array<ShameAsset>;
+export async function listShameAssets(): Promise<ShameAsset[]> {
+  await ensureDbSchema();
 
-  return rows;
+  const result = await sql<ShameAsset>`
+    SELECT id, asset_url, storage_key, content_type, original_filename, created_at::text AS created_at
+    FROM shame_asset
+    ORDER BY created_at DESC
+  `;
+
+  return result.rows;
+}
+
+export async function readPersistedOuraAccessToken(): Promise<string | null> {
+  const settings = await readSettings();
+  return settings.oura_access_token;
+}
+
+export async function writePersistedOuraAccessToken(accessToken: string): Promise<void> {
+  await ensureDbSchema();
+  await sql`UPDATE settings SET oura_access_token = ${accessToken} WHERE id = 1`;
 }

@@ -66,18 +66,18 @@ export async function POST(request: Request) {
       contentType: maybeFile.type,
     });
 
-    const newAssetId = createShameAsset({
+    const newAssetId = await createShameAsset({
       asset_url: blob.url,
       storage_key: blob.pathname,
       content_type: blob.contentType,
       original_filename: maybeFile.name,
     });
 
-    const previousAssetId = readSettings().shame_asset_id;
-    setCurrentShameAssetId(newAssetId);
+    const previousAssetId = (await readSettings()).shame_asset_id;
+    await setCurrentShameAssetId(newAssetId);
 
     if (previousAssetId) {
-      const previousAsset = readShameAssetById(previousAssetId);
+      const previousAsset = await readShameAssetById(previousAssetId);
 
       if (previousAsset?.asset_url) {
         try {

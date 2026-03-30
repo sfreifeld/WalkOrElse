@@ -1,82 +1,94 @@
-import { DatabaseSync } from "node:sqlite";
-import path from "node:path";
-import { mkdirSync } from "node:fs";
-
-const DEFAULT_DB_PATH = path.join(process.cwd(), "data", "walkorelse.db");
-const configuredPath = process.env.DATABASE_FILE_PATH
-  ? path.resolve(process.env.DATABASE_FILE_PATH)
-  : DEFAULT_DB_PATH;
-
-mkdirSync(path.dirname(configuredPath), { recursive: true });
-
-const db = new DatabaseSync(configuredPath);
-db.exec("PRAGMA journal_mode = WAL;");
-
-db.exec("PRAGMA foreign_keys = ON;");
+import { sql } from "@vercel/postgres";
 
 let schemaReady = false;
+let schemaPromise: Promise<void> | null = null;
 
-function ensureSettingsShameAssetColumn(): void {
-  const columns = db
-    .prepare("PRAGMA table_info(settings)")
-    .all() as Array<{ name: string }>;
+function getDatabaseUrl(): string {
+  const value =
+    process.env.POSTGRES_URL ??
+    process.env.POSTGRES_PRISMA_URL ??
+    process.env.DATABASE_URL;
 
-  const hasShameAssetId = columns.some((column) => column.name === "shame_asset_id");
-
-  if (!hasShameAssetId) {
-    db.exec("ALTER TABLE settings ADD COLUMN shame_asset_id INTEGER;");
+  if (!value) {
+    throw new Error(
+      "Missing hosted Postgres connection string. Set POSTGRES_URL (Vercel Postgres) or DATABASE_URL (Neon)."
+    );
   }
+
+  return value;
 }
 
-export function ensureDbSchema(): void {
+async function ensureSettingsColumns(): Promise<void> {
+  await sql`
+    ALTER TABLE settings
+    ADD COLUMN IF NOT EXISTS shame_asset_id INTEGER;
+  `;
+
+  await sql`
+    ALTER TABLE settings
+    ADD COLUMN IF NOT EXISTS oura_access_token TEXT;
+  `;
+}
+
+export async function ensureDbSchema(): Promise<void> {
   if (schemaReady) {
     return;
   }
 
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS settings (
-      id INTEGER PRIMARY KEY CHECK (id = 1),
-      threshold INTEGER NOT NULL DEFAULT 10000,
-      timezone TEXT NOT NULL DEFAULT 'UTC',
-      cutoff_time TEXT NOT NULL DEFAULT '21:00',
-      paused INTEGER NOT NULL DEFAULT 0,
-      tweet_template TEXT NOT NULL DEFAULT '',
-      shame_asset_id INTEGER,
-      FOREIGN KEY (shame_asset_id) REFERENCES shame_asset(id) ON DELETE SET NULL
-    );
+  if (!schemaPromise) {
+    schemaPromise = (async () => {
+      // Ensure this throws a clear message before any SQL is attempted.
+      getDatabaseUrl();
 
-    CREATE TABLE IF NOT EXISTS daily_state (
-      date TEXT PRIMARY KEY,
-      latest_steps INTEGER NOT NULL,
-      last_checked_at TEXT NOT NULL,
-      posted INTEGER NOT NULL DEFAULT 0
-    );
+      await sql`
+        CREATE TABLE IF NOT EXISTS shame_asset (
+          id SERIAL PRIMARY KEY,
+          asset_url TEXT,
+          storage_key TEXT,
+          content_type TEXT NOT NULL,
+          original_filename TEXT,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          CHECK (asset_url IS NOT NULL OR storage_key IS NOT NULL)
+        );
+      `;
 
-    CREATE TABLE IF NOT EXISTS shame_asset (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      asset_url TEXT,
-      storage_key TEXT,
-      content_type TEXT NOT NULL,
-      original_filename TEXT,
-      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      CHECK (asset_url IS NOT NULL OR storage_key IS NOT NULL)
-    );
-  `);
+      await sql`
+        CREATE TABLE IF NOT EXISTS settings (
+          id INTEGER PRIMARY KEY CHECK (id = 1),
+          threshold INTEGER NOT NULL DEFAULT 10000,
+          timezone TEXT NOT NULL DEFAULT 'UTC',
+          cutoff_time TEXT NOT NULL DEFAULT '21:00',
+          paused BOOLEAN NOT NULL DEFAULT FALSE,
+          tweet_template TEXT NOT NULL DEFAULT '',
+          shame_asset_id INTEGER REFERENCES shame_asset(id) ON DELETE SET NULL,
+          oura_access_token TEXT
+        );
+      `;
 
-  ensureSettingsShameAssetColumn();
+      await sql`
+        CREATE TABLE IF NOT EXISTS daily_state (
+          date DATE PRIMARY KEY,
+          latest_steps INTEGER NOT NULL,
+          last_checked_at TIMESTAMPTZ NOT NULL,
+          posted BOOLEAN NOT NULL DEFAULT FALSE
+        );
+      `;
 
-  db.exec(
-    `INSERT INTO settings (id) VALUES (1) ON CONFLICT(id) DO NOTHING;`
-  );
+      await ensureSettingsColumns();
 
-  schemaReady = true;
+      await sql`
+        INSERT INTO settings (id)
+        VALUES (1)
+        ON CONFLICT (id) DO NOTHING;
+      `;
+
+      schemaReady = true;
+    })();
+  }
+
+  await schemaPromise;
 }
 
-export function getDb(): DatabaseSync {
-  ensureDbSchema();
-  return db;
-}
-
-export function getDatabaseFilePath(): string {
-  return configuredPath;
+export function getDatabaseConnectionString(): string {
+  return getDatabaseUrl();
 }
