@@ -103,3 +103,37 @@ export async function fetchOuraDailyActivityForToday(params?: {
 
   return { requested_date: today, date, activity };
 }
+
+export async function fetchOuraDailyActivityForDate(date: string): Promise<{
+  requested_date: string;
+  date: string;
+  activity: OuraDailyActivity | null;
+}> {
+  const token = await getOuraAccessToken();
+
+  const url = new URL("https://api.ouraring.com/v2/usercollection/daily_activity");
+  url.searchParams.set("start_date", date);
+  url.searchParams.set("end_date", date);
+
+  const response = await fetch(url, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    const body = await response.text();
+    throw new Error(`Oura API error (${response.status}): ${body}`);
+  }
+
+  const payload = (await response.json()) as OuraDailyActivityResponse;
+  const activity = payload.data?.[0] ?? null;
+
+  return {
+    requested_date: date,
+    date: activity?.day ?? date,
+    activity,
+  };
+}
