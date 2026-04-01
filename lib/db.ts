@@ -74,6 +74,23 @@ export async function ensureDbSchema(): Promise<void> {
         );
       `;
 
+      await sql`
+        CREATE TABLE IF NOT EXISTS daily_enforcement (
+          date DATE PRIMARY KEY,
+          outcome TEXT NOT NULL,
+          reason TEXT NOT NULL,
+          finalized BOOLEAN NOT NULL,
+          threshold INTEGER NOT NULL,
+          timezone TEXT NOT NULL,
+          cutoff_time TEXT NOT NULL,
+          steps INTEGER,
+          oura_data_status TEXT NOT NULL,
+          oura_data_date DATE,
+          evaluated_at TIMESTAMPTZ NOT NULL,
+          details_json JSONB
+        );
+      `;
+
       await ensureSettingsColumns();
 
       await sql`

@@ -27,6 +27,24 @@ export type ShameAsset = {
   created_at: string;
 };
 
+export type EnforcementOutcome = "pass" | "fail" | "skip" | "pending";
+export type OuraDataStatus = "available" | "unavailable";
+
+export type DailyEnforcementState = {
+  date: string;
+  outcome: EnforcementOutcome;
+  reason: string;
+  finalized: boolean;
+  threshold: number;
+  timezone: string;
+  cutoff_time: string;
+  steps: number | null;
+  oura_data_status: OuraDataStatus;
+  oura_data_date: string | null;
+  evaluated_at: string;
+  details_json: Record<string, unknown> | null;
+};
+
 export async function readSettings(): Promise<AppSettings> {
   await ensureDbSchema();
 
@@ -176,4 +194,80 @@ export async function readPersistedOuraAccessToken(): Promise<string | null> {
 export async function writePersistedOuraAccessToken(accessToken: string): Promise<void> {
   await ensureDbSchema();
   await sql`UPDATE settings SET oura_access_token = ${accessToken} WHERE id = 1`;
+}
+
+export async function readDailyEnforcementByDate(
+  date: string
+): Promise<DailyEnforcementState | null> {
+  await ensureDbSchema();
+
+  const result = await sql<DailyEnforcementState>`
+    SELECT
+      date::text AS date,
+      outcome,
+      reason,
+      finalized,
+      threshold,
+      timezone,
+      cutoff_time,
+      steps,
+      oura_data_status,
+      oura_data_date::text AS oura_data_date,
+      evaluated_at::text AS evaluated_at,
+      details_json
+    FROM daily_enforcement
+    WHERE date = ${date}
+  `;
+
+  return result.rows[0] ?? null;
+}
+
+export async function upsertDailyEnforcement(
+  state: DailyEnforcementState
+): Promise<void> {
+  await ensureDbSchema();
+
+  await sql`
+    INSERT INTO daily_enforcement (
+      date,
+      outcome,
+      reason,
+      finalized,
+      threshold,
+      timezone,
+      cutoff_time,
+      steps,
+      oura_data_status,
+      oura_data_date,
+      evaluated_at,
+      details_json
+    )
+    VALUES (
+      ${state.date},
+      ${state.outcome},
+      ${state.reason},
+      ${state.finalized},
+      ${state.threshold},
+      ${state.timezone},
+      ${state.cutoff_time},
+      ${state.steps},
+      ${state.oura_data_status},
+      ${state.oura_data_date},
+      ${state.evaluated_at},
+      ${JSON.stringify(state.details_json)}::jsonb
+    )
+    ON CONFLICT(date)
+    DO UPDATE SET
+      outcome = excluded.outcome,
+      reason = excluded.reason,
+      finalized = excluded.finalized,
+      threshold = excluded.threshold,
+      timezone = excluded.timezone,
+      cutoff_time = excluded.cutoff_time,
+      steps = excluded.steps,
+      oura_data_status = excluded.oura_data_status,
+      oura_data_date = excluded.oura_data_date,
+      evaluated_at = excluded.evaluated_at,
+      details_json = excluded.details_json
+  `;
 }

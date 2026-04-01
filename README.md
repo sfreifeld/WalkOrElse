@@ -72,3 +72,20 @@ curl http://localhost:3000/api/oura/daily-activity
 ```
 
 Expected: JSON response (`ok: true` or `ok: false`) and never HTML error pages from route-level failures.
+
+## Daily enforcement engine
+
+Use `/api/enforcement` to inspect or evaluate pass/fail/skip state for a day.
+
+- `GET /api/enforcement` → inspect today's enforcement record in settings timezone.
+- `GET /api/enforcement?evaluate=1` → evaluate and persist for today.
+- `GET /api/enforcement?evaluate=1&dry_run=1` → evaluate without persistence.
+- `GET /api/enforcement?date=YYYY-MM-DD&evaluate=1` → evaluate a specific day.
+- `POST /api/enforcement` with JSON body `{ "date": "YYYY-MM-DD", "dry_run": true, "force": false }`.
+
+Behavior:
+- Uses `threshold`, `timezone`, `cutoff_time`, and `paused` from settings.
+- Finalizes pass/fail only after cutoff.
+- If paused, records `skip` and finalizes immediately.
+- If Oura data is unavailable or fetch fails, outcome is explicit `pending` with reason and never defaults to 0 steps.
+- Repeated runs are idempotent: finalized days are reused unless `force=true`.
