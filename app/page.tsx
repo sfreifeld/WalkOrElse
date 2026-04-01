@@ -1,9 +1,12 @@
 import { SettingsPanel } from "@/components/settings-panel";
 import { StepStatusCard } from "@/components/step-status-card";
-import { readSettings } from "@/lib/persistence";
+import { readSettings, readShameAssetById } from "@/lib/persistence";
 
 export default async function Home() {
   const settings = await readSettings();
+  const currentShameAsset = settings.shame_asset_id
+    ? await readShameAssetById(settings.shame_asset_id)
+    : null;
 
   return (
     <main className="page-shell">
@@ -22,6 +25,16 @@ export default async function Home() {
             paused: settings.paused,
             tweet_template: settings.tweet_template,
           }}
+          initialShameImage={
+            currentShameAsset?.asset_url
+              ? {
+                  id: currentShameAsset.id,
+                  url: currentShameAsset.asset_url,
+                  content_type: currentShameAsset.content_type,
+                  original_filename: currentShameAsset.original_filename,
+                }
+              : null
+          }
         />
 
         <p className="hash">#WALKORELSE</p>
