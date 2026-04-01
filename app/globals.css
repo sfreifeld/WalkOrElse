@@ -301,3 +301,45 @@ body::before {
     align-items: flex-start;
   }
 }
+
+.shame-image-panel {
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+.shame-image-title {
+  margin-bottom: 0.2rem;
+}
+
+.shame-image-preview {
+  display: block;
+  width: min(100%, 440px);
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  margin: 0.8rem 0;
+  background: #050505;
+}
+
+.shame-upload-label {
+  display: inline-block;
+  margin-top: 0.35rem;
+  position: relative;
+}
+
+.shame-upload-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 54px;
+  font-size: clamp(1rem, 1.8vw, 1.3rem);
+  padding: 0.8rem 1.2rem;
+}
+
+.shame-upload-input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
