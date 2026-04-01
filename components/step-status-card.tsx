@@ -16,8 +16,6 @@ type OuraDailyActivityResponse = {
 
 type LoadState = "loading" | "success" | "empty" | "error";
 
-const THRESHOLD = 5000;
-
 function formatSyncedTime(value: string | null | undefined) {
   if (!value) {
     return null;
@@ -38,7 +36,7 @@ function formatSyncedTime(value: string | null | undefined) {
   }).format(parsed);
 }
 
-export function StepStatusCard() {
+export function StepStatusCard({ threshold }: { threshold: number }) {
   const [loadState, setLoadState] = useState<LoadState>("loading");
   const [steps, setSteps] = useState<number | null>(null);
   const [lastCheckedAt, setLastCheckedAt] = useState<string | null>(null);
@@ -75,8 +73,7 @@ export function StepStatusCard() {
         throw new Error(data?.error ?? "Failed to load latest Oura activity.");
       }
 
-      const syncedSteps =
-        data.persisted?.latest_steps ?? data.oura_activity?.steps ?? null;
+      const syncedSteps = data.persisted?.latest_steps ?? data.oura_activity?.steps ?? null;
       const syncedAt = data.persisted?.last_checked_at ?? null;
 
       setSteps(syncedSteps);
@@ -91,9 +88,7 @@ export function StepStatusCard() {
     } catch (error) {
       setLoadState("error");
       setErrorMessage(
-        error instanceof Error
-          ? error.message
-          : "Something went wrong while syncing steps."
+        error instanceof Error ? error.message : "Something went wrong while syncing steps."
       );
     }
   }, []);
@@ -102,10 +97,7 @@ export function StepStatusCard() {
     void fetchLatestActivity();
   }, [fetchLatestActivity]);
 
-  const readableLastSynced = useMemo(
-    () => formatSyncedTime(lastCheckedAt),
-    [lastCheckedAt]
-  );
+  const readableLastSynced = useMemo(() => formatSyncedTime(lastCheckedAt), [lastCheckedAt]);
 
   if (loadState === "loading") {
     return (
@@ -149,13 +141,9 @@ export function StepStatusCard() {
         <p className="step-label">STEPS</p>
       </div>
 
-      <p className="status-copy">
-        {safeSteps >= THRESHOLD ? "YOU SURVIVED TODAY." : "YOU FAILED TODAY."}
-      </p>
+      <p className="status-copy">{safeSteps >= threshold ? "YOU SURVIVED TODAY." : "YOU FAILED TODAY."}</p>
 
-      <p className="sync-copy">
-        LAST SYNCED: {readableLastSynced ?? "UNKNOWN"}
-      </p>
+      <p className="sync-copy">LAST SYNCED: {readableLastSynced ?? "UNKNOWN"}</p>
     </>
   );
 }

@@ -61,6 +61,27 @@ export async function readSettings(): Promise<AppSettings> {
   return row;
 }
 
+export async function updateSettings(settings: {
+  threshold: number;
+  timezone: string;
+  cutoff_time: string;
+  paused: boolean;
+  tweet_template: string;
+}): Promise<void> {
+  await ensureDbSchema();
+
+  await sql`
+    UPDATE settings
+    SET
+      threshold = ${settings.threshold},
+      timezone = ${settings.timezone},
+      cutoff_time = ${settings.cutoff_time},
+      paused = ${settings.paused},
+      tweet_template = ${settings.tweet_template}
+    WHERE id = 1
+  `;
+}
+
 export async function upsertDailyState(state: DailyState): Promise<void> {
   await ensureDbSchema();
 
