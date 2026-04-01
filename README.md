@@ -73,6 +73,25 @@ curl http://localhost:3000/api/oura/daily-activity
 
 Expected: JSON response (`ok: true` or `ok: false`) and never HTML error pages from route-level failures.
 
+
+## Cron dry-run route (Vercel)
+
+Use `GET /api/cron/daily-enforcement` for scheduled daily evaluation.
+
+- Dry-run is **enabled by default** (`dryRun=true` implied).
+- Optional query params:
+  - `dryRun=true|false` (or `dry_run=1|0`)
+  - `date=YYYY-MM-DD` to target a specific day in the configured timezone.
+
+Dry-run response includes:
+- `status`: `before_cutoff | skipped_paused | missing_data | passed | failed`
+- `would_post`: whether a shame post would be sent in live mode
+- `summary`: human-readable one-line explanation
+- `inputs`: date, threshold, steps, cutoff, paused, and timezone context
+- `safety`: explicit no-post/no-posted-flag behavior and persistence details
+
+`vercel.json` includes a starter cron schedule for this route (`5 5 * * *`). Adjust timing as needed for your timezone and cutoff.
+
 ## Daily enforcement engine
 
 Use `/api/enforcement` to inspect or evaluate pass/fail/skip state for a day.
