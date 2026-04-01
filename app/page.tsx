@@ -1,25 +1,28 @@
+import { SettingsPanel } from "@/components/settings-panel";
 import { StepStatusCard } from "@/components/step-status-card";
+import { readSettings } from "@/lib/persistence";
 
-const paused = false;
+export default async function Home() {
+  const settings = await readSettings();
 
-export default function Home() {
   return (
     <main className="page-shell">
       <section className="panel" aria-label="Walk Or Else status panel">
         <p className="eyebrow">WALK OR ELSE</p>
 
-        {paused && <p className="paused-ribbon">PAUSED</p>}
+        {settings.paused && <p className="paused-ribbon">PAUSED</p>}
 
-        <StepStatusCard />
+        <StepStatusCard threshold={settings.threshold} />
 
-        <div className="actions">
-          <button className="btn btn-secondary" type="button">
-            Pause
-          </button>
-          <button className="btn btn-primary" type="button">
-            Upload Image
-          </button>
-        </div>
+        <SettingsPanel
+          initialSettings={{
+            threshold: settings.threshold,
+            timezone: settings.timezone,
+            cutoff_time: settings.cutoff_time,
+            paused: settings.paused,
+            tweet_template: settings.tweet_template,
+          }}
+        />
 
         <p className="hash">#WALKORELSE</p>
       </section>
